@@ -3,19 +3,19 @@
   description: >-
     Automation blueprint for the eMotion Air (Zigbee version).
 
-    Button actions are reported through the standard Multistate Input Basic
-    cluster (0x0012) present_value attribute. No ZHA quirk is required if ZHA
-    exposes a present_value sensor for the device after pairing / re-interview.
+    Button actions are reported through Multistate Input Basic (0x0012)
+    present_value (or Analog Input present_value if used).
 
     present_value mapping:
       0 = idle
       1 = single click
       2 = double click
       3 = triple click
-      4 = hold (fires after the button has been held for about 2 seconds)
+      4 = hold (about 2 seconds)
 
-    Select the eMotion Air device itself (not battery / humidity sensors).
-    The blueprint automatically resolves that device's present_value sensor.
+    Select the eMotion Air device itself (not battery / humidity).
+    After flashing and re-pairing, the device must expose a present_value
+    sensor entity for this blueprint to fire.
   domain: automation
   input:
     remote:
@@ -52,7 +52,7 @@
 mode: restart
 max_exceeded: silent
 
-trigger_variables:
+variables:
   device_id: !input remote
   button_entity: >-
     {% set ents = device_entities(device_id) | list %}
@@ -62,29 +62,36 @@ trigger_variables:
        | first
        | default(
            ents
-           | select('search', 'multistate')
+           | select('search', 'analog_input')
            | list
            | first
-           | default('')
+           | default(
+               ents
+               | select('search', 'multistate')
+               | list
+               | first
+               | default('')
+             )
          )
     }}
 
 triggers:
-  - trigger: state
-    entity_id: "{{ button_entity }}"
-    not_to:
-      - "0"
-      - "unknown"
-      - "unavailable"
-      - ""
+  - trigger: event
+    event_type: state_changed
 
 conditions:
   - condition: template
-    value_template: "{{ button_entity != '' }}"
+    value_template: >-
+      {{ button_entity != ''
+         and trigger.event.data.entity_id == button_entity
+         and trigger.event.data.new_state is not none
+         and trigger.event.data.new_state.state not in ['0', 'unknown', 'unavailable', '']
+         and (trigger.event.data.old_state is none
+              or trigger.event.data.new_state.state != trigger.event.data.old_state.state) }}
 
 actions:
   - variables:
-      button_value: "{{ trigger.to_state.state | int(-1) }}"
+      button_value: "{{ trigger.event.data.new_state.state | int(-1) }}"
   - choose:
       - conditions:
           - condition: template
