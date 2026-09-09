@@ -1,23 +1,31 @@
-﻿blueprint:
+blueprint:
   name: LinknLink eMotion Air Smart Button Controller (v2)
   description: >-
-    Automation blueprint for the eMotion Air (Zigbee version), firmware with the
-    proprietary 0xFC00 button action cluster.
+    Automation blueprint for the eMotion Air (Zigbee version).
 
-    Supports single click, double click, triple click and hold.
+    Button actions are reported through the standard Multistate Input Basic
+    cluster (0x0012) present_value attribute. No ZHA quirk is required.
 
-    NOTE: this version REQUIRES the emotion_air_quirk.py ZHA quirk to be
-    installed. There is no "release" action any more, and "hold" fires as soon
-    as the button has been held for 2 seconds (it does not wait for release).
+    present_value mapping:
+      0 = idle
+      1 = single click
+      2 = double click
+      3 = triple click
+      4 = hold (fires after the button has been held for about 2 seconds)
+
+    Select the Multistate Input / present_value sensor entity of your
+    eMotion Air device (created by ZHA after pairing / re-interview).
   domain: automation
   input:
-    remote:
-      name: Select eMotion Air Device
+    button_entity:
+      name: eMotion Air Button Entity (present_value)
+      description: >-
+        ZHA sensor entity for Multistate Input present_value on the eMotion Air.
+        Typical name contains present_value / multistate_input.
       selector:
-        device:
+        entity:
           integration: zha
-          manufacturer: LinknLink
-          model: eMotion Air
+          domain: sensor
     single_press:
       name: Single Click Action
       default: []
@@ -34,7 +42,7 @@
       selector:
         action: {}
     long_press:
-      name: Hold Action (button held for 2s)
+      name: Hold Action (button held for ~2s)
       default: []
       selector:
         action: {}
@@ -43,30 +51,32 @@ mode: restart
 max_exceeded: silent
 
 triggers:
-  - trigger: event
-    event_type: zha_event
-    event_data:
-      device_id: !input remote
+  - trigger: state
+    entity_id: !input button_entity
+    not_to:
+      - "0"
+      - "unknown"
+      - "unavailable"
 
 conditions: []
 
 actions:
   - variables:
-      command: "{{ trigger.event.data.command }}"
+      button_value: "{{ trigger.to_state.state | int(-1) }}"
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ command == 'single' }}"
+            value_template: "{{ button_value == 1 }}"
         sequence: !input single_press
       - conditions:
           - condition: template
-            value_template: "{{ command == 'double' }}"
+            value_template: "{{ button_value == 2 }}"
         sequence: !input double_press
       - conditions:
           - condition: template
-            value_template: "{{ command == 'triple' }}"
+            value_template: "{{ button_value == 3 }}"
         sequence: !input triple_press
       - conditions:
           - condition: template
-            value_template: "{{ command == 'hold' }}"
+            value_template: "{{ button_value == 4 }}"
         sequence: !input long_press
