@@ -1,0 +1,72 @@
+﻿blueprint:
+  name: LinknLink eMotion Air Smart Button Controller (v2)
+  description: >-
+    Automation blueprint for the eMotion Air (Zigbee version), firmware with the
+    proprietary 0xFC00 button action cluster.
+
+    Supports single click, double click, triple click and hold.
+
+    NOTE: this version REQUIRES the emotion_air_quirk.py ZHA quirk to be
+    installed. There is no "release" action any more, and "hold" fires as soon
+    as the button has been held for 2 seconds (it does not wait for release).
+  domain: automation
+  input:
+    remote:
+      name: Select eMotion Air Device
+      selector:
+        device:
+          integration: zha
+          manufacturer: LinknLink
+          model: eMotion Air
+    single_press:
+      name: Single Click Action
+      default: []
+      selector:
+        action: {}
+    double_press:
+      name: Double Click Action
+      default: []
+      selector:
+        action: {}
+    triple_press:
+      name: Triple Click Action
+      default: []
+      selector:
+        action: {}
+    long_press:
+      name: Hold Action (button held for 2s)
+      default: []
+      selector:
+        action: {}
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+
+conditions: []
+
+actions:
+  - variables:
+      command: "{{ trigger.event.data.command }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ command == 'single' }}"
+        sequence: !input single_press
+      - conditions:
+          - condition: template
+            value_template: "{{ command == 'double' }}"
+        sequence: !input double_press
+      - conditions:
+          - condition: template
+            value_template: "{{ command == 'triple' }}"
+        sequence: !input triple_press
+      - conditions:
+          - condition: template
+            value_template: "{{ command == 'hold' }}"
+        sequence: !input long_press
