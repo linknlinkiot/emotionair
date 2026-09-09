@@ -1,10 +1,11 @@
-blueprint:
+﻿blueprint:
   name: LinknLink eMotion Air Smart Button Controller (v2)
   description: >-
     Automation blueprint for the eMotion Air (Zigbee version).
 
     Button actions are reported through the standard Multistate Input Basic
-    cluster (0x0012) present_value attribute. No ZHA quirk is required.
+    cluster (0x0012) present_value attribute. No ZHA quirk is required if ZHA
+    exposes a present_value sensor for the device after pairing / re-interview.
 
     present_value mapping:
       0 = idle
@@ -13,19 +14,20 @@ blueprint:
       3 = triple click
       4 = hold (fires after the button has been held for about 2 seconds)
 
-    Select the Multistate Input / present_value sensor entity of your
-    eMotion Air device (created by ZHA after pairing / re-interview).
+    Select the eMotion Air device itself (not battery / humidity sensors).
+    The blueprint automatically resolves that device's present_value sensor.
   domain: automation
   input:
-    button_entity:
-      name: eMotion Air Button Entity (present_value)
+    remote:
+      name: Select eMotion Air Device
       description: >-
-        ZHA sensor entity for Multistate Input present_value on the eMotion Air.
-        Typical name contains present_value / multistate_input.
+        Choose the LinknLink eMotion Air Zigbee device. Do not select battery,
+        humidity or other sensor entities.
       selector:
-        entity:
+        device:
           integration: zha
-          domain: sensor
+          manufacturer: LinknLink
+          model: eMotion Air
     single_press:
       name: Single Click Action
       default: []
@@ -50,15 +52,35 @@ blueprint:
 mode: restart
 max_exceeded: silent
 
+trigger_variables:
+  device_id: !input remote
+  button_entity: >-
+    {% set ents = device_entities(device_id) | list %}
+    {{ ents
+       | select('search', 'present_value')
+       | list
+       | first
+       | default(
+           ents
+           | select('search', 'multistate')
+           | list
+           | first
+           | default('')
+         )
+    }}
+
 triggers:
   - trigger: state
-    entity_id: !input button_entity
+    entity_id: "{{ button_entity }}"
     not_to:
       - "0"
       - "unknown"
       - "unavailable"
+      - ""
 
-conditions: []
+conditions:
+  - condition: template
+    value_template: "{{ button_entity != '' }}"
 
 actions:
   - variables:
