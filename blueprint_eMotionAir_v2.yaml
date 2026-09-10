@@ -1,29 +1,21 @@
 # Optional helper. Preferred path for V1.2.7+ is the quirk (zha_event + last_action entity).
-﻿blueprint:
+blueprint:
   name: LinknLink eMotion Air Smart Button Controller (v2)
   description: >-
-    Automation blueprint for the eMotion Air (Zigbee version).
+    Optional automation blueprint for eMotion Air (Zigbee).
 
-    Button actions are reported through Analog Input Basic (0x000C)
-    present_value. ZHA creates this sensor natively without a quirk.
+    Preferred path for firmware V1.2.7+:
+      install the ZHA quirk, then trigger on zha_event /
+      device triggers / last_action entity.
 
-    present_value mapping:
-      0 = idle
-      1 = single click
-      2 = double click
-      3 = triple click
-      4 = hold (about 2 seconds)
-
-    Select the eMotion Air device itself (not battery / humidity).
-    After flashing V1.2.5+ and re-pairing, the device should expose a
-    present_value / analog_input sensor entity for this blueprint to fire.
+    This blueprint listens to zha_event commands:
+      single / double / triple / hold
   domain: automation
   input:
     remote:
       name: Select eMotion Air Device
       description: >-
-        Choose the LinknLink eMotion Air Zigbee device. Do not select battery,
-        humidity or other sensor entities.
+        Choose the LinknLink eMotion Air Zigbee device.
       selector:
         device:
           integration: zha
@@ -55,58 +47,48 @@ max_exceeded: silent
 
 variables:
   device_id: !input remote
-  button_entity: >-
-    {% set ents = device_entities(device_id) | list %}
-    {{ ents
-       | select('search', 'analog_input')
-       | list
-       | first
-       | default(
-           ents
-           | select('search', 'present_value')
-           | list
-           | first
-           | default(
-               ents
-               | select('search', 'button_action')
-               | list
-               | first
-               | default('')
-             )
-         )
-    }}
 
 triggers:
   - trigger: event
-    event_type: state_changed
-
-conditions:
-  - condition: template
-    value_template: >-
-      {{ button_entity != ''
-         and trigger.event.data.entity_id == button_entity
-         and trigger.event.data.new_state is not none
-         and trigger.event.data.new_state.state not in ['0', '0.0', 'unknown', 'unavailable', '']
-         and (trigger.event.data.old_state is none
-              or trigger.event.data.new_state.state != trigger.event.data.old_state.state) }}
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+      command: single
+    id: single
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+      command: double
+    id: double
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+      command: triple
+    id: triple
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+      command: hold
+    id: hold
 
 actions:
-  - variables:
-      button_value: "{{ trigger.event.data.new_state.state | float(-1) | int }}"
   - choose:
       - conditions:
-          - condition: template
-            value_template: "{{ button_value == 1 }}"
+          - condition: trigger
+            id: single
         sequence: !input single_press
       - conditions:
-          - condition: template
-            value_template: "{{ button_value == 2 }}"
+          - condition: trigger
+            id: double
         sequence: !input double_press
       - conditions:
-          - condition: template
-            value_template: "{{ button_value == 3 }}"
+          - condition: trigger
+            id: triple
         sequence: !input triple_press
       - conditions:
-          - condition: template
-            value_template: "{{ button_value == 4 }}"
+          - condition: trigger
+            id: hold
         sequence: !input long_press
