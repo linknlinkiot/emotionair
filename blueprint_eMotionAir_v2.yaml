@@ -1,3 +1,4 @@
+# Optional helper. Preferred path for V1.2.7+ is the quirk (zha_event + last_action entity).
 ﻿blueprint:
   name: LinknLink eMotion Air Smart Button Controller (v2)
   description: >-
